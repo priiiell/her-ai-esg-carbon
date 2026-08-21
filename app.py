@@ -102,7 +102,7 @@ if uploaded_file is not None and model is not None:
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     orig_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     
-    # Proses Prediksi Model YOLO
+    # Proses Prediksi Model YOLO (Ambil indeks pertama [0])
     results = model(orig_img)
     result = results[0]
     
@@ -180,6 +180,7 @@ if uploaded_file is not None and model is not None:
                 cmap="Greens", fill=True, 
                 bw_adjust=0.5, alpha=0.6, ax=ax_heat
             )
+        # Perbaikan pengambilan bentuk shape gambar asli drone
         ax_heat.set_xlim(0, result.orig_shape[1])
         ax_heat.set_ylim(result.orig_shape[0], 0)
         ax_heat.axis('off')
@@ -195,7 +196,6 @@ if uploaded_file is not None and model is not None:
             )
             ax_bar.set_ylabel("Gram CO2", fontsize=12)
             ax_bar.set_xlabel("Jenis Kendaraan", fontsize=12)
-            # Modifikasi estetika grafik biar menyatu dengan tema
             fig_bar.patch.set_facecolor('#FFFFFF')
             ax_bar.set_facecolor('#F4F9F4')
             st.pyplot(fig_bar)
