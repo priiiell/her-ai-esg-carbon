@@ -1,8 +1,7 @@
 streamlit
-pandas
-numpy
-plotly
-opencv-python-headless
 ultralytics
+opencv-python-headless
+numpy
+pandas
 matplotlib
 seaborn
