@@ -1,6 +1,5 @@
-ultralytics
-opencv-python-headless
-pandas
-matplotlib
-seaborn
 streamlit
+pandas
+numpy
+plotly
+opencv-python-headless
