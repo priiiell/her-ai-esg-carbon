@@ -1,11 +1,14 @@
+import os
+# Trik sistem agar OpenCV Headless berjalan lancar di Linux Server
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
 import streamlit as st
-from ultralytics import YOLO
 import cv2
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
+from ultralytics import YOLO
 
 # Konfigurasi Halaman Streamlit
 st.set_page_config(
@@ -23,7 +26,7 @@ st.markdown("""
     .stApp {
         background-color: #FFFFFF;
     }
-    h1, h2, h3, p {
+    h1, h2, h3, p, [data-testid="stMarkdownContainer"] p {
         color: #1E5631 !important;
     }
     .sidebar .sidebar-content {
@@ -51,19 +54,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Memuat Model YOLOv8 OBB (Mencari file best.pt di direktori aktif)
+# Memuat Model YOLOv8 OBB (best.pt di direktori aktif)
 @st.cache_resource
 def load_model():
     model_path = 'best.pt'
     if os.path.exists(model_path):
         return YOLO(model_path)
     else:
-        st.error(f"❌ File model '{model_path}' tidak ditemukan di folder aplikasi Anda. Pastikan file sudah dipindahkan!")
+        st.error(f"❌ File model '{model_path}' tidak ditemukan di root folder. Pastikan file 'best.pt' sudah di-upload ke GitHub sejajar dengan app.py!")
         return None
 
 model = load_model()
 
-# Faktor Emisi CO2 Berdasarkan Notebook (g CO2 / km)
+# Faktor Emisi CO2 (g CO2 / km) sesuai data notebook Anda
 EMISSION_FACTORS = {
     'bike': 115,
     'car': 192,
@@ -77,7 +80,7 @@ road_length_km = 0.1
 # --- SIDEBAR ---
 st.sidebar.header("🌱 MENU UTAMA")
 
-# 1. Bagian Unggah Foto Drone
+# 1. Tempat Upload Foto
 uploaded_file = st.sidebar.file_uploader(
     "Unggah Foto Udara Drone", 
     type=['jpg', 'jpeg', 'png']
@@ -85,12 +88,12 @@ uploaded_file = st.sidebar.file_uploader(
 
 st.sidebar.markdown("---")
 
-# 2. Bagian Keunggulan Fitur
+# 2. Edukasi Manfaat di Sidebar
 st.sidebar.subheader("✨ Apa Bagusnya Aplikasi Ini?")
 st.sidebar.markdown("""
-* **Deteksi Presisi (OBB):** Menggunakan kotak miring (*Oriented Bounding Box*) yang sangat akurat untuk mendeteksi kendaraan dari sudut pandang udara lurus (drone).
-* **Audit ESG Instan:** Mengonversi objek kendaraan langsung menjadi metrik estimasi emisi karbon secara *real-time*.
-* **Visualisasi Spasial:** Dilengkapi peta panas (*heatmap*) untuk mendeteksi titik jenuh polusi udara di jalan raya.
+* **Deteksi Presisi (OBB):** Menggunakan kotak miring (*Oriented Bounding Box*) yang sangat akurat untuk objek berputar dari sudut pandang udara.
+* **Audit ESG Instan:** Mengonversi jenis objek kendaraan langsung menjadi estimasi emisi karbon secara *real-time*.
+* **Visualisasi Spasial:** Dilengkapi peta panas (*heatmap*) untuk mendeteksi titik jenuh kepadatan karbon di jalan raya.
 """)
 
 # --- HALAMAN UTAMA ---
@@ -98,25 +101,25 @@ st.title("🌱 ESG Drone Carbon Detection Dashboard")
 st.write("Analisis jejak karbon kendaraan bermotor secara otomatis menggunakan citra udara drone.")
 
 if uploaded_file is not None and model is not None:
-    # Konversi file unggahan ke format OpenCV
+    # Baca file upload ke OpenCV format
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     orig_img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     
-    # Proses Prediksi Model YOLO (Ambil indeks pertama [0])
+    # Jalankan Prediksi YOLO
     results = model(orig_img)
-    result = results[0]
+    result = results[0]  # Mengambil indeks list pertama hasil deteksi gambar
     
-    # Ekstraksi Data Hasil Deteksi
     detected_classes = []
     centers_x = []
     centers_y = []
     
+    # Ekstraksi koordinat pusat dan nama kelas OBB
     if result.obb is not None:
         detected_classes = [model.names[int(cls_id)] for cls_id in result.obb.cls]
         centers_x = [box[0].item() for box in result.obb.xywhr]
         centers_y = [box[1].item() for box in result.obb.xywhr]
 
-    # Hitung Kalkulasi Emisi dan Kelompokkan Data
+    # Hitung Kalkulasi Emisi ESG
     total_vehicles = len(detected_classes)
     total_co2 = 0
     emission_details = []
@@ -133,7 +136,7 @@ if uploaded_file is not None and model is not None:
     else:
         df_grouped = pd.DataFrame(columns=['Kendaraan', 'Emisi (g CO2)'])
 
-    # --- KOTAK RINGKASAN METRIK (KPI CARDS) ---
+    # --- KOTAK METRIK UTAMA (KPI CARDS) ---
     col_m1, col_m2 = st.columns(2)
     with col_m1:
         st.markdown(f"""
@@ -150,26 +153,23 @@ if uploaded_file is not None and model is not None:
             </div>
         """, unsafe_allow_html=True)
 
-    # Buat Gambar yang Ber-annotated (Box Deteksi)
+    # Plotting box deteksi OBB ke gambar asli
     annotated_img = result.plot()
     text_str = f"Total Emisi: {total_co2:.2f} g CO2"
-    cv2.putText(annotated_img, text_str, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 128, 0), 5, cv2.LINE_AA)
+    cv2.putText(annotated_img, text_str, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (0, 128, 0), 4, cv2.LINE_AA)
 
-    # --- GRID VISUALISASI ---
+    # --- TAMPILAN DASHBOARD ---
     st.subheader("📊 Hasil Analisis Visual & Spasial")
     
     col1, col2 = st.columns(2)
-    
     with col1:
         st.markdown("### 📷 Foto Asli Drone")
         st.image(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB), use_container_width=True)
-        
     with col2:
         st.markdown("### 🎯 Deteksi Berkotak OBB")
         st.image(cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB), use_container_width=True)
 
     col3, col4 = st.columns(2)
-    
     with col3:
         st.markdown("### 🔥 Heatmap Kepadatan Emisi")
         fig_heat, ax_heat = plt.subplots(figsize=(10, 8))
@@ -180,11 +180,11 @@ if uploaded_file is not None and model is not None:
                 cmap="Greens", fill=True, 
                 bw_adjust=0.5, alpha=0.6, ax=ax_heat
             )
-        # Perbaikan pengambilan bentuk shape gambar asli drone
         ax_heat.set_xlim(0, result.orig_shape[1])
         ax_heat.set_ylim(result.orig_shape[0], 0)
         ax_heat.axis('off')
         st.pyplot(fig_heat)
+        plt.close(fig_heat)
         
     with col4:
         st.markdown("### 📈 Distribusi Emisi per Kelas")
@@ -199,15 +199,16 @@ if uploaded_file is not None and model is not None:
             fig_bar.patch.set_facecolor('#FFFFFF')
             ax_bar.set_facecolor('#F4F9F4')
             st.pyplot(fig_bar)
+            plt.close(fig_bar)
         else:
-            st.info("Tidak ada data emisi untuk membuat grafik batang.")
+            st.info("Tidak ada data emisi untuk memetakan grafik batang.")
 
-    # --- TABEL RINCIAN ---
+    # --- TABEL DATA ---
     st.markdown("### 📋 Tabel Rincian Emisi CO2")
     if not df_grouped.empty:
         st.dataframe(df_grouped.style.format({'Emisi (g CO2)': '{:.2f}'}), use_container_width=True)
     else:
-        st.info("Belum ada kendaraan yang terdeteksi.")
+        st.info("Belum ada data emisi kendaraan.")
 
 else:
-    st.info("💡 Silakan unggah foto udara drone pada sidebar sebelah kiri untuk memulai analisis deteksi emisi karbon.")
+    st.info("💡 Silakan unggah foto udara drone pada sidebar sebelah kiri untuk memulai kalkulasi deteksi emisi karbon.")
